@@ -1,0 +1,49 @@
+<div id="scripter_settings" class="scripter-settings">
+    <div class="inline-drawer">
+        <div class="inline-drawer-toggle inline-drawer-header">
+            <div class="flex-container alignitemscenter margin0">
+                <b>Script Supervisor</b>
+            </div>
+            <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
+        </div>
+        <div class="inline-drawer-content">
+            <div class="scripter-settings-block">
+                <label>
+                    <input type="checkbox" id="scripter-enabled" checked>
+                    스크립터 활성화
+                </label>
+                <label>
+                    <input type="checkbox" id="scripter-quick-btn-enabled" checked>
+                    퀵버튼 표시
+                </label>
+                <label>
+                    <input type="checkbox" id="scripter-shortcut-enabled" checked>
+                    단축키 활성화 (Ctrl+Shift+C)
+                </label>
+            </div>
+            
+            <hr class="scripter-settings-divider">
+            
+            <div class="scripter-settings-block">
+                <label>Final Check 프롬프트</label>
+                <textarea id="scripter-final-check-prompt" rows="8">[Silent Instruction: DO NOT OUTPUT THIS CHECKLIST]
+Before generating the response, strictly verify the following internally:
+1. **Boundaries:** Did I stop before the &lt;NextScene&gt; events?
+2. **Continuity:** Did I skip events from &lt;CurrentScene&gt; that already happened in the chat?
+3. **Consistency:** Is the response free of contradictions with World Info and recent context?
+(If any answer is NO, revise explicitly before outputting.)</textarea>
+                <div class="scripter-settings-buttons">
+                    <button id="scripter-save-settings" class="scripter-settings-btn">저장</button>
+                    <button id="scripter-reset-settings" class="scripter-settings-btn danger">초기화</button>
+                </div>
+            </div>
+            
+            <hr class="scripter-settings-divider">
+            
+            <div class="scripter-settings-block">
+                <button id="scripter-clear-all-data" class="scripter-settings-btn danger">데이터 초기화</button>
+                <small style="display: block; margin-top: 5px; color: #888;">모든 채팅의 Scripter 데이터를 삭제합니다.</small>
+            </div>
+        </div>
+    </div>
+</div>
