@@ -1,0 +1,207 @@
+<!-- Sidebar Popup -->
+<div id="scripter-sidebar-popup" class="hidden">
+    <div class="scripter-header">
+        <h3>SCRIPT SUPERVISOR</h3>
+        <div class="scripter-header-buttons">
+            <button id="scripter-popout-btn" class="scripter-header-btn" title="Open in popup">⇱</button>
+            <button id="scripter-sidebar-close" class="scripter-header-btn" title="Close">✕</button>
+        </div>
+    </div>
+    <div class="scripter-content">
+        <!-- Status Controls -->
+        <div class="scripter-status-controls">
+            <button id="scripter-ready-btn" class="scripter-status-btn ready active">
+                <span class="indicator">●</span> READY
+            </button>
+            <button id="scripter-action-btn" class="scripter-status-btn action">
+                <span class="indicator">○</span> ACTION
+            </button>
+            <span class="scripter-status-divider">│</span>
+            <button id="scripter-montage-btn" class="scripter-montage-btn" title="Montage Mode">⏩</button>
+        </div>
+        
+        <!-- CUT Section -->
+        <div class="scripter-cut-section">
+            <button id="scripter-cut-btn" class="scripter-cut-btn">
+                🎬 CUT!
+            </button>
+            <label class="scripter-auto-action">
+                <input type="checkbox" id="scripter-auto-action">
+                Auto-proceed Action
+            </label>
+        </div>
+        
+        <!-- Caution Block -->
+        <div class="scripter-block" data-block="caution">
+            <div class="scripter-block-header collapsed">
+                <span class="icon">⚠️</span>
+                <span class="title">Caution</span>
+                <span class="toggle">▼</span>
+            </div>
+            <div class="scripter-block-content collapsed">
+                <textarea id="scripter-caution" placeholder="Enter cautions..."></textarea>
+            </div>
+        </div>
+        
+        <!-- Current Scene Block -->
+        <div class="scripter-block" data-block="current">
+            <div class="scripter-block-header">
+                <span class="icon">🎬</span>
+                <span class="title">Current Scene (Main)</span>
+                <span class="toggle">▼</span>
+            </div>
+            <div class="scripter-block-content">
+                <textarea id="scripter-current-scene" placeholder="Enter current scene..."></textarea>
+                <div class="scripter-current-scene-footer">
+                    <button id="scripter-rollback-btn" class="scripter-rollback-btn" title="Restore previous scene" disabled>↩</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Next Scene Block -->
+        <div class="scripter-block" data-block="next">
+            <div class="scripter-block-header">
+                <span class="icon">⏭️</span>
+                <span class="title">Next Scene (Teaser)</span>
+                <span class="toggle">▼</span>
+            </div>
+            <div class="scripter-block-content">
+                <textarea id="scripter-next-scene" placeholder="Enter next scene..."></textarea>
+                <div class="scripter-next-scene-footer">
+                    <button id="scripter-upcoming-btn" class="scripter-upcoming-btn">Upcoming...</button>
+                    <span class="scripter-queue-count">Queue: <span id="scripter-queue-count-num">0</span></span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Core Principle Block -->
+        <div class="scripter-block" data-block="core">
+            <div class="scripter-block-header collapsed">
+                <span class="icon">📋</span>
+                <span class="title">Core Principle</span>
+                <span class="toggle">▼</span>
+            </div>
+            <div class="scripter-block-content collapsed">
+                <textarea id="scripter-core-principle" placeholder="Enter core principle..."></textarea>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Center Popup -->
+<div id="scripter-center-popup-overlay" class="hidden">
+    <div id="scripter-center-popup">
+        <div class="scripter-header">
+            <h3>SCRIPT SUPERVISOR</h3>
+            <div class="scripter-header-buttons">
+                <button id="scripter-center-close" class="scripter-header-btn" title="Close">✕</button>
+            </div>
+        </div>
+        <div class="scripter-popup-content">
+            <!-- Column 1: Current Scene -->
+            <div class="scripter-popup-column">
+                <div class="scripter-block" data-block="current-popup">
+                    <div class="scripter-block-header">
+                        <span class="icon">🎬</span>
+                        <span class="title">Current Scene (Main)</span>
+                        <span class="toggle">▼</span>
+                    </div>
+                    <div class="scripter-block-content">
+                        <textarea id="scripter-current-scene-popup" placeholder="Enter current scene..."></textarea>
+                        <div class="scripter-current-scene-footer">
+                            <button id="scripter-rollback-btn-popup" class="scripter-rollback-btn" title="Restore previous scene" disabled>↩</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Column 2: Next Scene -->
+            <div class="scripter-popup-column">
+                <div class="scripter-block" data-block="next-popup">
+                    <div class="scripter-block-header">
+                        <span class="icon">⏭️</span>
+                        <span class="title">Next Scene (Teaser)</span>
+                        <span class="toggle">▼</span>
+                    </div>
+                    <div class="scripter-block-content">
+                        <textarea id="scripter-next-scene-popup" placeholder="Enter next scene..."></textarea>
+                        <div class="scripter-next-scene-footer">
+                            <button id="scripter-upcoming-btn-popup" class="scripter-upcoming-btn">Upcoming...</button>
+                            <span class="scripter-queue-count">Queue: <span id="scripter-queue-count-num-popup">0</span></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Column 3: Caution + Core + Controls -->
+            <div class="scripter-popup-column">
+                <div class="scripter-block" data-block="caution-popup">
+                    <div class="scripter-block-header collapsed">
+                        <span class="icon">⚠️</span>
+                        <span class="title">Caution</span>
+                        <span class="toggle">▼</span>
+                    </div>
+                    <div class="scripter-block-content collapsed">
+                        <textarea id="scripter-caution-popup" placeholder="Enter cautions..."></textarea>
+                    </div>
+                </div>
+                
+                <div class="scripter-block" data-block="core-popup">
+                    <div class="scripter-block-header collapsed">
+                        <span class="icon">📋</span>
+                        <span class="title">Core Principle</span>
+                        <span class="toggle">▼</span>
+                    </div>
+                    <div class="scripter-block-content collapsed">
+                        <textarea id="scripter-core-principle-popup" placeholder="Enter core principle..."></textarea>
+                    </div>
+                </div>
+                
+                <div class="scripter-popup-controls">
+                    <div class="scripter-status-controls">
+                        <button id="scripter-ready-btn-popup" class="scripter-status-btn ready active">
+                            <span class="indicator">●</span> READY
+                        </button>
+                        <button id="scripter-action-btn-popup" class="scripter-status-btn action">
+                            <span class="indicator">○</span> ACTION
+                        </button>
+                        <span class="scripter-status-divider">│</span>
+                        <button id="scripter-montage-btn-popup" class="scripter-montage-btn" title="Montage Mode">⏩</button>
+                    </div>
+                    <button id="scripter-cut-btn-popup" class="scripter-cut-btn">
+                        🎬 CUT!
+                    </button>
+                    <label class="scripter-auto-action">
+                        <input type="checkbox" id="scripter-auto-action-popup">
+                        Auto-proceed Action
+                    </label>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Queue Management Popup -->
+<div id="scripter-queue-popup-overlay" class="hidden">
+    <div id="scripter-queue-popup">
+        <div class="scripter-header">
+            <h3>Scene Queue</h3>
+            <div class="scripter-header-buttons">
+                <button id="scripter-queue-close" class="scripter-header-btn" title="Close">✕</button>
+            </div>
+        </div>
+        <div class="scripter-queue-content">
+            <div id="scripter-queue-list">
+                <!-- Queue items will be dynamically added here -->
+            </div>
+            <button id="scripter-queue-add" class="scripter-queue-add-btn">+ Add Scene</button>
+        </div>
+        <div class="scripter-queue-footer">
+            <div class="scripter-queue-footer-left">
+                <button id="scripter-queue-import" class="scripter-queue-footer-btn">Import</button>
+                <button id="scripter-queue-export" class="scripter-queue-footer-btn">Export</button>
+            </div>
+            <button id="scripter-queue-clear" class="scripter-queue-footer-btn danger">Clear All</button>
+        </div>
+    </div>
+</div>
