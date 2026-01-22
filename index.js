@@ -362,7 +362,6 @@ function executeCut() {
     
     saveChatData();
     syncUIFromData();
-    injectPrompt();
     
     // Show toast
     if (nextPreview) {
@@ -428,7 +427,6 @@ function executeRollback() {
     
     saveChatData();
     syncUIFromData();
-    injectPrompt();
     
     toastr.success('Scene restored', 'Rollback');
 }
@@ -733,7 +731,6 @@ function setupSettingsHandlers() {
         settings.enabled = $(this).prop('checked');
         saveSettings();
         updateQuickButtonVisibility();
-        injectPrompt();
     });
     
     // Quick button checkbox
@@ -793,7 +790,6 @@ function setupEventHandlers() {
         data.status = 'ready';
         saveChatData();
         updateStatusButtons(data.status, data.montage);
-        injectPrompt();
     });
     
     $('#scripter-action-btn').on('click', function() {
@@ -802,7 +798,6 @@ function setupEventHandlers() {
         data.status = 'action';
         saveChatData();
         updateStatusButtons(data.status, data.montage);
-        injectPrompt();
     });
     
     $('#scripter-montage-btn').on('click', function() {
@@ -810,7 +805,6 @@ function setupEventHandlers() {
         data.montage = !data.montage;
         saveChatData();
         updateStatusButtons(data.status, data.montage);
-        injectPrompt();
     });
     
     // Status buttons - Popup
@@ -820,7 +814,6 @@ function setupEventHandlers() {
         data.status = 'ready';
         saveChatData();
         updateStatusButtons(data.status, data.montage);
-        injectPrompt();
     });
     
     $('#scripter-action-btn-popup').on('click', function() {
@@ -829,7 +822,6 @@ function setupEventHandlers() {
         data.status = 'action';
         saveChatData();
         updateStatusButtons(data.status, data.montage);
-        injectPrompt();
     });
     
     $('#scripter-montage-btn-popup').on('click', function() {
@@ -837,7 +829,6 @@ function setupEventHandlers() {
         data.montage = !data.montage;
         saveChatData();
         updateStatusButtons(data.status, data.montage);
-        injectPrompt();
     });
     
     // CUT buttons
@@ -922,11 +913,17 @@ function setupChatEvents() {
         const context = getContext();
         currentChatId = context.chatId;
         syncUIFromData();
+    });
+    
+    // 메시지 생성 직전에 프롬프트 주입 (가장 중요!)
+    eventSource.on(event_types.GENERATION_STARTED, () => {
+        console.log('[Scripter] Generation started - injecting prompt');
         injectPrompt();
     });
     
-    // After message is sent, handle auto-action
-    eventSource.on(event_types.MESSAGE_SENT, () => {
+    // After AI response is received, handle auto-action
+    // (READY 상태에서 메시지 전송 후 AI 응답이 오면 ACTION으로 전환)
+    eventSource.on(event_types.MESSAGE_RECEIVED, () => {
         const data = getChatData();
         const settings = getSettings();
         
@@ -934,10 +931,10 @@ function setupChatEvents() {
         
         // If auto-action is enabled and status is READY, switch to ACTION
         if (data.autoAction && data.status === 'ready' && !data.montage) {
+            console.log('[Scripter] Auto-proceeding to ACTION');
             data.status = 'action';
             saveChatData();
             updateStatusButtons(data.status, data.montage);
-            injectPrompt();
         }
     });
 }
@@ -978,9 +975,8 @@ jQuery(async () => {
     setupShortcuts();
     setupChatEvents();
     
-    // Initial sync
+    // Initial sync (UI만 동기화, 프롬프트는 생성 시점에 주입)
     syncUIFromData();
-    injectPrompt();
     
     console.log('Scripter extension loaded');
 });
