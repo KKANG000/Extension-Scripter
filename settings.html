@@ -24,6 +24,40 @@
             
             <hr class="scripter-settings-divider">
             
+            <!-- 테마 설정 -->
+            <div class="scripter-settings-block">
+                <label>테마 (Theme)</label>
+                <select id="scripter-theme" class="text_pole">
+                    <option value="default">Default (SillyTavern)</option>
+                    <option value="glassmorphism">Glassmorphism</option>
+                </select>
+            </div>
+            
+            <hr class="scripter-settings-divider">
+            
+            <!-- 사이드바 너비 설정 -->
+            <div class="scripter-settings-block">
+                <label>
+                    <input type="checkbox" id="scripter-auto-resize" checked>
+                    자동 반응형 사이드바 너비
+                </label>
+                <div class="scripter-settings-buttons">
+                    <button id="scripter-reset-width" class="scripter-settings-btn">너비 초기화</button>
+                </div>
+            </div>
+            
+            <hr class="scripter-settings-divider">
+            
+            <!-- 퀵버튼 동작 설정 -->
+            <div class="scripter-settings-block">
+                <label>
+                    <input type="checkbox" id="scripter-quick-btn-cut">
+                    퀵버튼 클릭 시 'CUT!' 실행 (기본: 사이드바 열기)
+                </label>
+            </div>
+            
+            <hr class="scripter-settings-divider">
+            
             <div class="scripter-settings-block">
                 <label>Final Check 프롬프트</label>
                 <textarea id="scripter-final-check-prompt" rows="8">[Silent Instruction: DO NOT OUTPUT THIS CHECKLIST]

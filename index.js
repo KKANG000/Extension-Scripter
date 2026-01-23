@@ -65,10 +65,20 @@ Apply the following rules to structure the response:
    - **Strict Prohibition:** Do NOT start writing events from <NextScene>.`;
 
 // ============================================
+// Theme Definitions
+// ============================================
+
+const AVAILABLE_THEMES = [
+    { id: 'default', name: 'Default' },
+    { id: 'glassmorphism', name: 'Glassmorphism' }
+];
+
+// ============================================
 // State Management
 // ============================================
 
 let currentChatId = '';
+let resizeObserver = null;
 
 const defaultChatData = {
     status: 'ready', // 'ready' | 'action'
@@ -86,7 +96,11 @@ const defaultSettings = {
     enabled: true,
     quickButtonEnabled: true,
     shortcutEnabled: true,
-    finalCheckPrompt: DEFAULT_FINAL_CHECK
+    finalCheckPrompt: DEFAULT_FINAL_CHECK,
+    autoResize: true,
+    // New settings
+    theme: 'default',
+    quickButtonAction: 'sidebar' // 'sidebar' | 'cut'
 };
 
 // ============================================
@@ -97,12 +111,29 @@ function getSettings() {
     if (!extension_settings[MODULE_NAME]) {
         extension_settings[MODULE_NAME] = { ...defaultSettings };
     }
+    // Ensure new settings exist for upgrades
+    if (extension_settings[MODULE_NAME].theme === undefined) {
+        extension_settings[MODULE_NAME].theme = defaultSettings.theme;
+    }
+    if (extension_settings[MODULE_NAME].quickButtonAction === undefined) {
+        extension_settings[MODULE_NAME].quickButtonAction = defaultSettings.quickButtonAction;
+    }
+    if (extension_settings[MODULE_NAME].autoResize === undefined) {
+        extension_settings[MODULE_NAME].autoResize = defaultSettings.autoResize;
+    }
     return extension_settings[MODULE_NAME];
 }
-
 function getChatData() {
     if (!chat_metadata[MODULE_NAME]) {
-        chat_metadata[MODULE_NAME] = { ...defaultChatData };
+        // Deep copy defaults to avoid reference issues
+        chat_metadata[MODULE_NAME] = JSON.parse(JSON.stringify(defaultChatData));
+    } else {
+        // Merge missing keys from defaults (migration safety)
+        for (const key in defaultChatData) {
+            if (chat_metadata[MODULE_NAME][key] === undefined) {
+                chat_metadata[MODULE_NAME][key] = defaultChatData[key];
+            }
+        }
     }
     return chat_metadata[MODULE_NAME];
 }
@@ -113,6 +144,79 @@ function saveChatData() {
 
 function saveSettings() {
     saveSettingsDebounced();
+}
+
+// ============================================
+// Theme Management
+// ============================================
+
+function applyTheme(themeId) {
+    const sidebar = $('#scripter-sidebar-popup');
+    const centerPopup = $('#scripter-center-popup');
+    const queuePopup = $('#scripter-queue-popup');
+    
+    // Apply theme attribute to all scripter containers
+    [sidebar, centerPopup, queuePopup].forEach(el => {
+        if (el.length) {
+            el.attr('data-scripter-theme', themeId);
+        }
+    });
+}
+
+// ============================================
+// Sidebar Resizing
+// ============================================
+
+function setupSidebarResizing() {
+    // Try multiple possible chat container selectors
+    const chatContainer = document.getElementById('sheld') || document.getElementById('chat');
+    
+    if (chatContainer) {
+        // Disconnect existing observer if any
+        if (resizeObserver) {
+            resizeObserver.disconnect();
+        }
+        
+        resizeObserver = new ResizeObserver(() => {
+            updateSidebarWidth();
+        });
+        
+        resizeObserver.observe(chatContainer);
+    }
+    
+    // Initial sizing
+    updateSidebarWidth();
+}
+
+function updateSidebarWidth() {
+    const sidebar = document.getElementById('scripter-sidebar-popup');
+    const settings = getSettings();
+    if (!sidebar || !settings.autoResize) return; // Auto-resize check restored
+    
+    // Try to get chat width from ST's CSS variable or compute from element
+    const sheld = document.getElementById('sheld');
+    const chat = document.getElementById('chat');
+    const chatContainer = sheld || chat;
+    
+    let sidebarWidth = 350; // default
+    
+    if (chatContainer) {
+        const viewportWidth = window.innerWidth;
+        const chatRect = chatContainer.getBoundingClientRect();
+        const chatWidth = chatRect.width;
+        
+        // Calculate: if chat takes X% of viewport, sidebar takes remaining space * 0.5
+        // But also consider chat's right edge position
+        const rightSpace = viewportWidth - chatRect.right;
+
+        // Use 100% of the space to the right of the chat
+        sidebarWidth = Math.floor(rightSpace * 0.99);
+    }
+    
+    // Apply only the lower limit of 300px
+    sidebarWidth = Math.max(350, sidebarWidth);
+    
+    sidebar.style.width = sidebarWidth + 'px';
 }
 
 // ============================================
@@ -253,6 +357,12 @@ function syncUIFromData() {
     $('#scripter-quick-btn-enabled').prop('checked', settings.quickButtonEnabled);
     $('#scripter-shortcut-enabled').prop('checked', settings.shortcutEnabled);
     $('#scripter-final-check-prompt').val(settings.finalCheckPrompt);
+    $('#scripter-theme').val(settings.theme);
+    $('#scripter-auto-resize').prop('checked', settings.autoResize);
+    $('#scripter-quick-btn-cut').prop('checked', settings.quickButtonAction === 'cut');
+    
+    // Apply theme
+    applyTheme(settings.theme);
     
     // Quick button visibility
     updateQuickButtonVisibility();
@@ -310,7 +420,7 @@ function updateStatusButtons(status, montage) {
 
 function updateQueueCount() {
     const data = getChatData();
-    const count = data.queue.length;
+    const count = data.queue.filter(item => item.trim() !== '').length;
     $('#scripter-queue-count-num').text(count);
     $('#scripter-queue-count-num-popup').text(count);
 }
@@ -478,6 +588,7 @@ function updateQueueItem(index, value) {
     if (index >= 0 && index < data.queue.length) {
         data.queue[index] = value;
         saveChatData();
+        updateQueueCount();
     }
 }
 
@@ -562,6 +673,11 @@ function importQueue() {
 // ============================================
 
 function toggleBlock(header) {
+    // Don't toggle if inside center popup
+    if (header.closest('#scripter-center-popup').length > 0) {
+        return;
+    }
+    
     const content = header.next('.scripter-block-content');
     header.toggleClass('collapsed');
     content.toggleClass('collapsed');
@@ -573,13 +689,13 @@ function toggleBlock(header) {
 
 function setupTextAreaSync() {
     // Caution
-    $('#scripter-caution').on('input', function() {
+    $('#scripter-caution').on('input change', function() {
         const val = $(this).val();
         $('#scripter-caution-popup').val(val);
         getChatData().caution = val;
         saveChatData();
     });
-    $('#scripter-caution-popup').on('input', function() {
+    $('#scripter-caution-popup').on('input change', function() {
         const val = $(this).val();
         $('#scripter-caution').val(val);
         getChatData().caution = val;
@@ -587,13 +703,13 @@ function setupTextAreaSync() {
     });
     
     // Current Scene
-    $('#scripter-current-scene').on('input', function() {
+    $('#scripter-current-scene').on('input change', function() {
         const val = $(this).val();
         $('#scripter-current-scene-popup').val(val);
         getChatData().currentScene = val;
         saveChatData();
     });
-    $('#scripter-current-scene-popup').on('input', function() {
+    $('#scripter-current-scene-popup').on('input change', function() {
         const val = $(this).val();
         $('#scripter-current-scene').val(val);
         getChatData().currentScene = val;
@@ -601,13 +717,13 @@ function setupTextAreaSync() {
     });
     
     // Next Scene
-    $('#scripter-next-scene').on('input', function() {
+    $('#scripter-next-scene').on('input change', function() {
         const val = $(this).val();
         $('#scripter-next-scene-popup').val(val);
         getChatData().nextScene = val;
         saveChatData();
     });
-    $('#scripter-next-scene-popup').on('input', function() {
+    $('#scripter-next-scene-popup').on('input change', function() {
         const val = $(this).val();
         $('#scripter-next-scene').val(val);
         getChatData().nextScene = val;
@@ -615,13 +731,13 @@ function setupTextAreaSync() {
     });
     
     // Core Principle
-    $('#scripter-core-principle').on('input', function() {
+    $('#scripter-core-principle').on('input change', function() {
         const val = $(this).val();
         $('#scripter-core-principle-popup').val(val);
         getChatData().corePrinciple = val;
         saveChatData();
     });
-    $('#scripter-core-principle-popup').on('input', function() {
+    $('#scripter-core-principle-popup').on('input change', function() {
         const val = $(this).val();
         $('#scripter-core-principle').val(val);
         getChatData().corePrinciple = val;
@@ -654,6 +770,8 @@ function openCenterPopup() {
 
 function closeCenterPopup() {
     $('#scripter-center-popup-overlay').addClass('hidden');
+    $('#scripter-sidebar-popup').removeClass('hidden');
+    syncUIFromData();
 }
 
 // ============================================
@@ -665,7 +783,7 @@ function addWandMenuItem() {
     
     const menuItem = $(`
         <div id="scripter-wand-menu-item" class="list-group-item flex-container flexGap5">
-            <div class="extensionsMenuExtensionButton fa-solid fa-film"></div>
+            <div class="extensionsMenuExtensionButton fa-solid fa-clapperboard"></div>
             Scripter
         </div>
     `);
@@ -681,23 +799,34 @@ function addWandMenuItem() {
 
 function addQuickButton() {
     // Find the send button area
-    const sendForm = $('#send_form');
     const sendButton = $('#send_but');
     
-    // Create quick button
+    // Create quick button with Font Awesome icon
     const quickBtn = $(`
-        <button id="scripter-quick-btn" title="CUT! (Ctrl+Shift+C)">🎬</button>
+        <button id="scripter-quick-btn" title="Scripter (Ctrl+Shift+C)">
+            <i class="fa-solid fa-clapperboard"></i>
+        </button>
     `);
     
     quickBtn.on('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
-        executeCut();
+        handleQuickButtonClick();
     });
     
     // Insert before send button
     sendButton.before(quickBtn);
     updateQuickButtonVisibility();
+}
+
+function handleQuickButtonClick() {
+    const settings = getSettings();
+    
+    if (settings.quickButtonAction === 'cut') {
+        executeCut();
+    } else {
+        toggleSidebar();
+    }
 }
 
 // ============================================
@@ -746,6 +875,44 @@ function setupSettingsHandlers() {
         const settings = getSettings();
         settings.shortcutEnabled = $(this).prop('checked');
         saveSettings();
+    });
+    
+    // Theme select
+    $('#scripter-theme').on('change', function() {
+        const settings = getSettings();
+        settings.theme = $(this).val();
+        saveSettings();
+        applyTheme(settings.theme);
+    });
+    
+    // Auto resize checkbox
+    $('#scripter-auto-resize').on('change', function() {
+        const settings = getSettings();
+        settings.autoResize = $(this).prop('checked');
+        saveSettings();
+        if (settings.autoResize) updateSidebarWidth();
+    });
+
+    // Reset width button
+    $('#scripter-reset-width').on('click', () => {
+        const sidebar = document.getElementById('scripter-sidebar-popup');
+        if (sidebar) {
+            sidebar.style.width = '350px';
+            toastr.info('Sidebar width reset to default');
+        }
+    });
+    
+    // Quick button action checkbox
+    $('#scripter-quick-btn-cut').on('change', function() {
+        const settings = getSettings();
+        settings.quickButtonAction = $(this).prop('checked') ? 'cut' : 'sidebar';
+        saveSettings();
+        
+        // Update tooltip
+        const tooltip = settings.quickButtonAction === 'cut' 
+            ? 'CUT! (Ctrl+Shift+C)' 
+            : 'Scripter (Ctrl+Shift+C)';
+        $('#scripter-quick-btn').attr('title', tooltip);
     });
     
     // Save final check prompt
@@ -915,14 +1082,13 @@ function setupChatEvents() {
         syncUIFromData();
     });
     
-    // 메시지 생성 직전에 프롬프트 주입 (가장 중요!)
+    // Inject prompt before generation
     eventSource.on(event_types.GENERATION_STARTED, () => {
         console.log('[Scripter] Generation started - injecting prompt');
         injectPrompt();
     });
     
     // After AI response is received, handle auto-action
-    // (READY 상태에서 메시지 전송 후 AI 응답이 오면 ACTION으로 전환)
     eventSource.on(event_types.MESSAGE_RECEIVED, () => {
         const data = getChatData();
         const settings = getSettings();
@@ -961,6 +1127,10 @@ jQuery(async () => {
     // Load sidebar HTML
     const sidebarHtml = await renderExtensionTemplateAsync(EXTENSION_FOLDER, 'sidebar');
     $('body').append(sidebarHtml);
+
+    // Update Montage button text to English
+    $('#scripter-montage-btn').text('MONTAGE');
+    $('#scripter-montage-btn-popup').text('MONTAGE');
     
     // Add wand menu item
     addWandMenuItem();
@@ -975,7 +1145,15 @@ jQuery(async () => {
     setupShortcuts();
     setupChatEvents();
     
-    // Initial sync (UI만 동기화, 프롬프트는 생성 시점에 주입)
+    // Setup sidebar resizing
+    setupSidebarResizing();
+    
+    // Handle window resize
+    $(window).on('resize', () => {
+        updateSidebarWidth();
+    });
+    
+    // Initial sync
     syncUIFromData();
     
     console.log('Scripter extension loaded');
