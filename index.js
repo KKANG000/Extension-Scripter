@@ -65,38 +65,25 @@ Apply the following rules to structure the response:
    - **Strict Prohibition:** Do NOT start writing events from <NextScene>.`;
 
 // ============================================
+// Theme Definitions
+// ============================================
+
+const AVAILABLE_THEMES = [
+    { id: 'default', name: 'Default' },
+    { id: 'glassmorphism', name: 'Glassmorphism' }
+];
+
+// ============================================
 // State Management
 // ============================================
 
 let resizeObserver = null;
-let sidebarResizeFrame = null;
-let promptCache = {
-    key: '',
-    value: ''
-};
-let chatEventHandlers = null;
-
-const EVENT_NS = '.scripter';
-const CHAT_FIELD_BINDINGS = [
-    { key: 'caution', selectors: ['#scripter-caution', '#scripter-caution-popup'] },
-    { key: 'currentScene', selectors: ['#scripter-current-scene', '#scripter-current-scene-popup'] },
-    { key: 'nextScene', selectors: ['#scripter-next-scene', '#scripter-next-scene-popup'] },
-    { key: 'corePrinciple', selectors: ['#scripter-core-principle', '#scripter-core-principle-popup'] }
-];
-
-const STATUS_BUTTON_BINDINGS = [
-    { selector: '#scripter-ready-btn', status: 'ready' },
-    { selector: '#scripter-action-btn', status: 'action' },
-    { selector: '#scripter-ready-btn-popup', status: 'ready' },
-    { selector: '#scripter-action-btn-popup', status: 'action' }
-];
-
-const MONTAGE_BUTTON_SELECTORS = ['#scripter-montage-btn', '#scripter-montage-btn-popup'];
 
 const defaultChatData = {
     status: 'ready', // 'ready' | 'action'
     montage: false,
     autoAction: false,
+    promptEnabled: true, // NEW: controls prompt injection per-chat
     caution: '',
     currentScene: '',
     nextScene: '',
@@ -111,9 +98,10 @@ const defaultSettings = {
     shortcutEnabled: true,
     finalCheckPrompt: DEFAULT_FINAL_CHECK,
     autoResize: true,
-    // New settings
     theme: 'default',
-    quickButtonAction: 'sidebar' // 'sidebar' | 'cut'
+    sidebarPosition: 'right', // 'left' | 'right'
+    quickButtonClick: 'sidebar', // 'sidebar' | 'toggle' | 'cut'
+    quickButtonDblClick: 'toggle' // 'sidebar' | 'toggle' | 'cut' | 'none'
 };
 
 // ============================================
@@ -128,8 +116,15 @@ function getSettings() {
     if (extension_settings[MODULE_NAME].theme === undefined) {
         extension_settings[MODULE_NAME].theme = defaultSettings.theme;
     }
-    if (extension_settings[MODULE_NAME].quickButtonAction === undefined) {
-        extension_settings[MODULE_NAME].quickButtonAction = defaultSettings.quickButtonAction;
+    if (extension_settings[MODULE_NAME].sidebarPosition === undefined) {
+        extension_settings[MODULE_NAME].sidebarPosition = defaultSettings.sidebarPosition;
+    }
+    // Migrate old quickButtonAction to new settings
+    if (extension_settings[MODULE_NAME].quickButtonClick === undefined) {
+        const oldAction = extension_settings[MODULE_NAME].quickButtonAction;
+        extension_settings[MODULE_NAME].quickButtonClick = oldAction === 'cut' ? 'cut' : 'sidebar';
+        extension_settings[MODULE_NAME].quickButtonDblClick = 'toggle';
+        delete extension_settings[MODULE_NAME].quickButtonAction;
     }
     if (extension_settings[MODULE_NAME].autoResize === undefined) {
         extension_settings[MODULE_NAME].autoResize = defaultSettings.autoResize;
@@ -159,73 +154,6 @@ function saveSettings() {
     saveSettingsDebounced();
 }
 
-function updateChatData(patchOrUpdater, options = {}) {
-    const { persist = true, sync = 'none' } = options;
-    const data = getChatData();
-
-    if (typeof patchOrUpdater === 'function') {
-        patchOrUpdater(data);
-    } else if (patchOrUpdater && typeof patchOrUpdater === 'object') {
-        Object.assign(data, patchOrUpdater);
-    }
-
-    if (persist) {
-        saveChatData();
-    }
-
-    if (sync === 'all') {
-        syncUIFromData();
-    } else if (sync === 'status') {
-        syncStatusControls(data);
-    } else if (sync === 'queue') {
-        syncQueueUI(data);
-    } else if (sync === 'autoAction') {
-        syncAutoActionCheckboxes(data);
-    } else if (sync === 'rollback') {
-        syncRollbackButtons(data);
-    }
-
-    return data;
-}
-
-function updateSettings(patchOrUpdater, options = {}) {
-    const { persist = true, sync = false } = options;
-    const settings = getSettings();
-
-    if (typeof patchOrUpdater === 'function') {
-        patchOrUpdater(settings);
-    } else if (patchOrUpdater && typeof patchOrUpdater === 'object') {
-        Object.assign(settings, patchOrUpdater);
-    }
-
-    if (persist) {
-        saveSettings();
-    }
-
-    if (sync) {
-        syncSettingsUI(settings);
-    }
-
-    return settings;
-}
-
-function toNamespacedEvents(events) {
-    return events
-        .split(' ')
-        .map(eventName => `${eventName}${EVENT_NS}`)
-        .join(' ');
-}
-
-function bindEvent(selector, events, handler) {
-    const namespacedEvents = toNamespacedEvents(events);
-    $(selector).off(namespacedEvents).on(namespacedEvents, handler);
-}
-
-function bindDelegatedEvent(selector, events, delegatedSelector, handler) {
-    const namespacedEvents = toNamespacedEvents(events);
-    $(selector).off(namespacedEvents, delegatedSelector).on(namespacedEvents, delegatedSelector, handler);
-}
-
 // ============================================
 // Theme Management
 // ============================================
@@ -234,7 +162,7 @@ function applyTheme(themeId) {
     const sidebar = $('#scripter-sidebar-popup');
     const centerPopup = $('#scripter-center-popup');
     const queuePopup = $('#scripter-queue-popup');
-    
+
     // Apply theme attribute to all scripter containers
     [sidebar, centerPopup, queuePopup].forEach(el => {
         if (el.length) {
@@ -243,75 +171,69 @@ function applyTheme(themeId) {
     });
 }
 
+function applySidebarPosition(position) {
+    const sidebar = $('#scripter-sidebar-popup');
+    if (position === 'left') {
+        sidebar.addClass('scripter-left');
+    } else {
+        sidebar.removeClass('scripter-left');
+    }
+}
+
 // ============================================
 // Sidebar Resizing
 // ============================================
 
 function setupSidebarResizing() {
-    teardownSidebarResizing();
-
     // Try multiple possible chat container selectors
     const chatContainer = document.getElementById('sheld') || document.getElementById('chat');
-
+    
     if (chatContainer) {
+        // Disconnect existing observer if any
+        if (resizeObserver) {
+            resizeObserver.disconnect();
+        }
+        
         resizeObserver = new ResizeObserver(() => {
-            scheduleSidebarWidthUpdate();
+            updateSidebarWidth();
         });
-
+        
         resizeObserver.observe(chatContainer);
     }
-
+    
     // Initial sizing
-    scheduleSidebarWidthUpdate();
-}
-
-function teardownSidebarResizing() {
-    if (resizeObserver) {
-        resizeObserver.disconnect();
-        resizeObserver = null;
-    }
-
-    if (sidebarResizeFrame !== null) {
-        cancelAnimationFrame(sidebarResizeFrame);
-        sidebarResizeFrame = null;
-    }
-}
-
-function scheduleSidebarWidthUpdate() {
-    if (sidebarResizeFrame !== null) {
-        return;
-    }
-
-    sidebarResizeFrame = requestAnimationFrame(() => {
-        sidebarResizeFrame = null;
-        updateSidebarWidth();
-    });
+    updateSidebarWidth();
 }
 
 function updateSidebarWidth() {
     const sidebar = document.getElementById('scripter-sidebar-popup');
     const settings = getSettings();
-    if (!sidebar || !settings.autoResize) return; // Auto-resize check restored
-    
-    // Try to get chat width from ST's CSS variable or compute from element
+    if (!sidebar || !settings.autoResize) return;
+
     const sheld = document.getElementById('sheld');
     const chat = document.getElementById('chat');
     const chatContainer = sheld || chat;
-    
+
     let sidebarWidth = 350; // default
-    
+
     if (chatContainer) {
         const viewportWidth = window.innerWidth;
         const chatRect = chatContainer.getBoundingClientRect();
-        const rightSpace = viewportWidth - chatRect.right;
 
-        // Use 100% of the space to the right of the chat
-        sidebarWidth = Math.floor(rightSpace);
+        // Calculate available space based on sidebar position
+        let availableSpace;
+        if (settings.sidebarPosition === 'left') {
+            availableSpace = chatRect.left;
+        } else {
+            availableSpace = viewportWidth - chatRect.right;
+        }
+
+        sidebarWidth = Math.floor(availableSpace * 0.99);
     }
-    
-    // Apply only the lower limit of 300px
+
+    // Apply minimum width
     sidebarWidth = Math.max(350, sidebarWidth);
-    
+
     sidebar.style.width = sidebarWidth + 'px';
 }
 
@@ -323,25 +245,11 @@ function generatePrompt() {
     const settings = getSettings();
     const data = getChatData();
 
-    if (!settings.enabled) {
-        promptCache = { key: '', value: '' };
+    // Check both global enabled and per-chat prompt toggle
+    if (!settings.enabled || !data.promptEnabled) {
         return '';
     }
-
-    const promptCacheKey = JSON.stringify({
-        status: data.status,
-        montage: data.montage,
-        caution: data.caution,
-        currentScene: data.currentScene,
-        nextScene: data.nextScene,
-        corePrinciple: data.corePrinciple,
-        finalCheckPrompt: settings.finalCheckPrompt
-    });
-
-    if (promptCache.key === promptCacheKey) {
-        return promptCache.value;
-    }
-
+    
     // Build PROTOCOL_VARIABLE
     let protocolVar;
     if (data.montage) {
@@ -409,11 +317,6 @@ Strict adherence to this entire protocol is mandatory. Failure to follow these i
 **Specifically, generating events from <NextScene> in the current response is a fatal narrative error that ruins the story structure. You are strictly prohibited from depicting these future events now.**
 You must execute the user's designed narrative exactly as directed without unauthorized deviation.`;
 
-    promptCache = {
-        key: promptCacheKey,
-        value: prompt
-    };
-
     return prompt;
 }
 
@@ -440,56 +343,54 @@ function injectPrompt() {
 function syncUIFromData() {
     const data = getChatData();
     const settings = getSettings();
-
-    syncStatusControls(data);
-    syncTextFields(data);
-    syncAutoActionCheckboxes(data);
-    syncQueueUI(data);
-    syncRollbackButtons(data);
-    syncSettingsUI(settings);
-}
-
-function syncStatusControls(data = getChatData()) {
+    
+    // Status buttons
     updateStatusButtons(data.status, data.montage);
-}
-
-function syncTextFields(data = getChatData()) {
-    for (const binding of CHAT_FIELD_BINDINGS) {
-        for (const selector of binding.selectors) {
-            $(selector).val(data[binding.key]);
-        }
-    }
-}
-
-function syncAutoActionCheckboxes(data = getChatData()) {
+    
+    // Text areas - sidebar
+    $('#scripter-caution').val(data.caution);
+    $('#scripter-current-scene').val(data.currentScene);
+    $('#scripter-next-scene').val(data.nextScene);
+    $('#scripter-core-principle').val(data.corePrinciple);
+    
+    // Text areas - popup
+    $('#scripter-caution-popup').val(data.caution);
+    $('#scripter-current-scene-popup').val(data.currentScene);
+    $('#scripter-next-scene-popup').val(data.nextScene);
+    $('#scripter-core-principle-popup').val(data.corePrinciple);
+    
+    // Auto-action checkbox
     $('#scripter-auto-action').prop('checked', data.autoAction);
     $('#scripter-auto-action-popup').prop('checked', data.autoAction);
-}
-
-function syncQueueUI(data = getChatData()) {
-    const count = data.queue.filter(item => item.trim() !== '').length;
-    $('#scripter-queue-count-num').text(count);
-    $('#scripter-queue-count-num-popup').text(count);
-}
-
-function syncRollbackButtons(data = getChatData()) {
+    
+    // Queue count
+    updateQueueCount();
+    
+    // Rollback button state
     const hasRollback = data.rollbackData !== null;
     $('#scripter-rollback-btn').prop('disabled', !hasRollback);
     $('#scripter-rollback-btn-popup').prop('disabled', !hasRollback);
-}
 
-function syncSettingsUI(settings = getSettings()) {
+    // Prompt toggle state (also updates quick button)
+    updatePromptToggle(data.promptEnabled);
+
+    // Settings panel
     $('#scripter-enabled').prop('checked', settings.enabled);
     $('#scripter-quick-btn-enabled').prop('checked', settings.quickButtonEnabled);
     $('#scripter-shortcut-enabled').prop('checked', settings.shortcutEnabled);
     $('#scripter-final-check-prompt').val(settings.finalCheckPrompt);
     $('#scripter-theme').val(settings.theme);
     $('#scripter-auto-resize').prop('checked', settings.autoResize);
-    $('#scripter-quick-btn-cut').prop('checked', settings.quickButtonAction === 'cut');
+    $('#scripter-sidebar-position').val(settings.sidebarPosition);
+    $('#scripter-quick-btn-click').val(settings.quickButtonClick);
+    $('#scripter-quick-btn-dblclick').val(settings.quickButtonDblClick);
 
+    // Apply theme and sidebar position
     applyTheme(settings.theme);
+    applySidebarPosition(settings.sidebarPosition);
+
+    // Quick button visibility
     updateQuickButtonVisibility();
-    updateQuickButtonTooltip(settings);
 }
 
 function updateStatusButtons(status, montage) {
@@ -543,7 +444,10 @@ function updateStatusButtons(status, montage) {
 }
 
 function updateQueueCount() {
-    syncQueueUI();
+    const data = getChatData();
+    const count = data.queue.filter(item => item.trim() !== '').length;
+    $('#scripter-queue-count-num').text(count);
+    $('#scripter-queue-count-num-popup').text(count);
 }
 
 function updateQuickButtonVisibility() {
@@ -556,10 +460,34 @@ function updateQuickButtonVisibility() {
     }
 }
 
-function updateQuickButtonTooltip(settings = getSettings()) {
-    const tooltip = settings.quickButtonAction === 'cut'
-        ? 'CUT! (Ctrl+Shift+C)'
-        : 'Scripter (Ctrl+Shift+C)';
+function updatePromptToggle(enabled) {
+    const toggles = $('#scripter-prompt-toggle, #scripter-prompt-toggle-popup');
+    toggles.toggleClass('active', enabled);
+    toggles.attr('title', enabled ? 'Prompt injection ON' : 'Prompt injection OFF');
+    updateQuickButtonState();
+}
+
+function updateQuickButtonState() {
+    const data = getChatData();
+    const quickBtn = $('#scripter-quick-btn');
+    quickBtn.toggleClass('prompt-off', !data.promptEnabled);
+}
+
+function updateQuickButtonTooltip() {
+    const settings = getSettings();
+    const actionLabels = {
+        sidebar: '사이드바',
+        toggle: '전송토글',
+        cut: 'CUT!',
+        none: '없음'
+    };
+    const clickLabel = actionLabels[settings.quickButtonClick];
+    const dblClickLabel = actionLabels[settings.quickButtonDblClick];
+
+    let tooltip = `클릭: ${clickLabel}`;
+    if (settings.quickButtonDblClick !== 'none') {
+        tooltip += ` / 더블클릭: ${dblClickLabel}`;
+    }
     $('#scripter-quick-btn').attr('title', tooltip);
 }
 
@@ -568,28 +496,39 @@ function updateQuickButtonTooltip(settings = getSettings()) {
 // ============================================
 
 function executeCut() {
+    const data = getChatData();
     const settings = getSettings();
-
+    
     if (!settings.enabled) {
         toastr.warning('Scripter is disabled');
         return;
     }
-
-    const data = getChatData();
+    
+    // Save rollback data
+    data.rollbackData = {
+        currentScene: data.currentScene,
+        nextScene: data.nextScene,
+        queue: [...data.queue]
+    };
+    
+    // Get preview for toast
     const nextPreview = data.nextScene.trim().substring(0, 20) + (data.nextScene.length > 20 ? '...' : '');
-
-    updateChatData(currentData => {
-        currentData.rollbackData = {
-            currentScene: currentData.currentScene,
-            nextScene: currentData.nextScene,
-            queue: [...currentData.queue]
-        };
-
-        currentData.currentScene = currentData.nextScene;
-        currentData.nextScene = currentData.queue.length > 0 ? currentData.queue.shift() : '';
-        currentData.status = 'ready';
-    }, { sync: 'all' });
-
+    
+    // Promote scenes
+    data.currentScene = data.nextScene;
+    
+    if (data.queue.length > 0) {
+        data.nextScene = data.queue.shift();
+    } else {
+        data.nextScene = '';
+    }
+    
+    // Reset status to READY
+    data.status = 'ready';
+    
+    saveChatData();
+    syncUIFromData();
+    
     // Show toast
     if (nextPreview) {
         toastr.success(`OK, Cut! Proceeding to next scene: "${nextPreview}"`, 'Scene Change');
@@ -642,17 +581,19 @@ function showRollbackConfirm() {
 
 function executeRollback() {
     const data = getChatData();
+    
     if (!data.rollbackData) {
         return;
     }
-
-    updateChatData(currentData => {
-        currentData.currentScene = currentData.rollbackData.currentScene;
-        currentData.nextScene = currentData.rollbackData.nextScene;
-        currentData.queue = [...currentData.rollbackData.queue];
-        currentData.rollbackData = null;
-    }, { sync: 'all' });
-
+    
+    data.currentScene = data.rollbackData.currentScene;
+    data.nextScene = data.rollbackData.nextScene;
+    data.queue = [...data.rollbackData.queue];
+    data.rollbackData = null;
+    
+    saveChatData();
+    syncUIFromData();
+    
     toastr.success('Scene restored', 'Rollback');
 }
 
@@ -690,55 +631,30 @@ function renderQueueList() {
     });
 }
 
-function refreshQueueItemIndices(startIndex = 0) {
-    $('#scripter-queue-list .scripter-queue-item').each(function(domIndex) {
-        if (domIndex < startIndex) {
-            return;
-        }
-
-        $(this).attr('data-index', domIndex);
-        $(this).find('.scripter-queue-item-number').text(`${domIndex + 1}.`);
-    });
-}
-
 function addQueueItem() {
-    const data = updateChatData(currentData => {
-        currentData.queue.push('');
-    }, { sync: 'queue' });
-
-    const index = data.queue.length - 1;
-    const item = $(`
-        <div class="scripter-queue-item" data-index="${index}">
-            <span class="scripter-queue-item-number">${index + 1}.</span>
-            <textarea class="scripter-queue-item-textarea"></textarea>
-            <div class="scripter-queue-item-buttons">
-                <button class="scripter-queue-item-btn move-up" title="Move up">↑</button>
-                <button class="scripter-queue-item-btn move-down" title="Move down">↓</button>
-                <button class="scripter-queue-item-btn delete" title="Delete">✕</button>
-            </div>
-        </div>
-    `);
-    $('#scripter-queue-list').append(item);
+    const data = getChatData();
+    data.queue.push('');
+    saveChatData();
+    renderQueueList();
+    updateQueueCount();
 }
 
 function updateQueueItem(index, value) {
     const data = getChatData();
-    if (index >= 0 && index < data.queue.length && data.queue[index] !== value) {
-        updateChatData(currentData => {
-            currentData.queue[index] = value;
-        }, { sync: 'queue' });
+    if (index >= 0 && index < data.queue.length) {
+        data.queue[index] = value;
+        saveChatData();
+        updateQueueCount();
     }
 }
 
 function deleteQueueItem(index) {
     const data = getChatData();
     if (index >= 0 && index < data.queue.length) {
-        updateChatData(currentData => {
-            currentData.queue.splice(index, 1);
-        }, { sync: 'queue' });
-
-        $('#scripter-queue-list .scripter-queue-item').eq(index).remove();
-        refreshQueueItemIndices(index);
+        data.queue.splice(index, 1);
+        saveChatData();
+        renderQueueList();
+        updateQueueCount();
     }
 }
 
@@ -747,29 +663,20 @@ function moveQueueItem(index, direction) {
     const newIndex = index + direction;
     
     if (newIndex >= 0 && newIndex < data.queue.length) {
-        updateChatData(currentData => {
-            const temp = currentData.queue[index];
-            currentData.queue[index] = currentData.queue[newIndex];
-            currentData.queue[newIndex] = temp;
-        });
-
-        const container = $('#scripter-queue-list');
-        const currentItem = container.children('.scripter-queue-item').eq(index);
-        const targetItem = container.children('.scripter-queue-item').eq(newIndex);
-
-        if (direction < 0) {
-            targetItem.before(currentItem);
-        } else {
-            targetItem.after(currentItem);
-        }
-
-        refreshQueueItemIndices(Math.min(index, newIndex));
+        const temp = data.queue[index];
+        data.queue[index] = data.queue[newIndex];
+        data.queue[newIndex] = temp;
+        saveChatData();
+        renderQueueList();
     }
 }
 
 function clearQueue() {
-    updateChatData({ queue: [] }, { sync: 'queue' });
-    $('#scripter-queue-list').empty();
+    const data = getChatData();
+    data.queue = [];
+    saveChatData();
+    renderQueueList();
+    updateQueueCount();
     toastr.info('Queue cleared');
 }
 
@@ -803,8 +710,11 @@ function importQueue() {
             const content = event.target.result;
             const scenes = content.split('\n---\n').map(s => s.trim()).filter(s => s);
             
-            updateChatData({ queue: scenes }, { sync: 'queue' });
+            const data = getChatData();
+            data.queue = scenes;
+            saveChatData();
             renderQueueList();
+            updateQueueCount();
             
             toastr.success(`Imported ${scenes.length} scenes`);
         };
@@ -833,22 +743,34 @@ function toggleBlock(header) {
 // Text Area Sync (Sidebar <-> Popup)
 // ============================================
 
+const TEXT_FIELD_MAP = [
+    { id: 'caution', dataKey: 'caution' },
+    { id: 'current-scene', dataKey: 'currentScene' },
+    { id: 'next-scene', dataKey: 'nextScene' },
+    { id: 'core-principle', dataKey: 'corePrinciple' }
+];
+
 function setupTextAreaSync() {
-    for (const binding of CHAT_FIELD_BINDINGS) {
-        for (const sourceSelector of binding.selectors) {
-            bindEvent(sourceSelector, 'input change', function() {
-                const value = $(this).val();
+    TEXT_FIELD_MAP.forEach(({ id, dataKey }) => {
+        const sidebarSel = `#scripter-${id}`;
+        const popupSel = `#scripter-${id}-popup`;
 
-                for (const targetSelector of binding.selectors) {
-                    if (targetSelector !== sourceSelector) {
-                        $(targetSelector).val(value);
-                    }
-                }
+        // Sidebar → Popup sync
+        $(sidebarSel).on('input change', function() {
+            const val = $(this).val();
+            $(popupSel).val(val);
+            getChatData()[dataKey] = val;
+            saveChatData();
+        });
 
-                updateChatData({ [binding.key]: value });
-            });
-        }
-    }
+        // Popup → Sidebar sync
+        $(popupSel).on('input change', function() {
+            const val = $(this).val();
+            $(sidebarSel).val(val);
+            getChatData()[dataKey] = val;
+            saveChatData();
+        });
+    });
 }
 
 // ============================================
@@ -886,64 +808,82 @@ function closeCenterPopup() {
 
 function addWandMenuItem() {
     const container = $('#extensionsMenu');
-
-    let menuItem = $('#scripter-wand-menu-item');
-    if (!menuItem.length) {
-        menuItem = $(`
-            <div id="scripter-wand-menu-item" class="list-group-item flex-container flexGap5">
-                <div class="extensionsMenuExtensionButton fa-solid fa-clapperboard"></div>
-                Scripter
-            </div>
-        `);
-        container.append(menuItem);
-    }
-
-    bindEvent('#scripter-wand-menu-item', 'click', () => {
+    
+    const menuItem = $(`
+        <div id="scripter-wand-menu-item" class="list-group-item flex-container flexGap5">
+            <div class="extensionsMenuExtensionButton fa-solid fa-clapperboard"></div>
+            Scripter
+        </div>
+    `);
+    
+    menuItem.on('click', () => {
         toggleSidebar();
         // Close the wand menu
         $('#extensionsMenu').removeClass('openDrawer');
     });
+    
+    container.append(menuItem);
 }
 
-function addQuickButton() {
-    if ($('#scripter-quick-btn').length) {
-        bindEvent('#scripter-quick-btn', 'click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            handleQuickButtonClick();
-        });
-        updateQuickButtonVisibility();
-        return;
-    }
+let quickBtnClickTimer = null;
+const DBLCLICK_DELAY = 250; // ms
 
+function addQuickButton() {
     // Find the send button area
     const sendButton = $('#send_but');
 
     // Create quick button with Font Awesome icon
     const quickBtn = $(`
-        <button id="scripter-quick-btn" title="Scripter (Ctrl+Shift+C)">
+        <button id="scripter-quick-btn" title="Scripter (Click: Open, DblClick: Toggle Prompt)">
             <i class="fa-solid fa-clapperboard"></i>
         </button>
     `);
 
-    quickBtn.on(toNamespacedEvents('click'), (e) => {
+    // Handle single vs double click
+    quickBtn.on('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
-        handleQuickButtonClick();
+
+        const settings = getSettings();
+
+        // If double-click is disabled, execute single click immediately
+        if (settings.quickButtonDblClick === 'none') {
+            executeQuickButtonAction(settings.quickButtonClick);
+            return;
+        }
+
+        if (quickBtnClickTimer) {
+            // Double click detected
+            clearTimeout(quickBtnClickTimer);
+            quickBtnClickTimer = null;
+            executeQuickButtonAction(settings.quickButtonDblClick);
+        } else {
+            // Wait to see if it's a double click
+            quickBtnClickTimer = setTimeout(() => {
+                quickBtnClickTimer = null;
+                executeQuickButtonAction(settings.quickButtonClick);
+            }, DBLCLICK_DELAY);
+        }
     });
-    
+
     // Insert before send button
     sendButton.before(quickBtn);
     updateQuickButtonVisibility();
+    updateQuickButtonState();
+    updateQuickButtonTooltip();
 }
 
-function handleQuickButtonClick() {
-    const settings = getSettings();
-    
-    if (settings.quickButtonAction === 'cut') {
-        executeCut();
-    } else {
-        toggleSidebar();
+function executeQuickButtonAction(action) {
+    switch (action) {
+        case 'sidebar':
+            toggleSidebar();
+            break;
+        case 'toggle':
+            handlePromptToggle();
+            break;
+        case 'cut':
+            executeCut();
+            break;
     }
 }
 
@@ -952,13 +892,13 @@ function handleQuickButtonClick() {
 // ============================================
 
 function setupShortcuts() {
-    bindEvent(document, 'keydown', (e) => {
+    $(document).on('keydown', (e) => {
         const settings = getSettings();
-
+        
         if (!settings.enabled || !settings.shortcutEnabled) {
             return;
         }
-
+        
         // Ctrl+Shift+C for CUT!
         if (e.ctrlKey && e.shiftKey && e.key === 'C') {
             e.preventDefault();
@@ -973,38 +913,46 @@ function setupShortcuts() {
 
 function setupSettingsHandlers() {
     // Enabled checkbox
-    bindEvent('#scripter-enabled', 'change', function() {
-        updateSettings({ enabled: $(this).prop('checked') });
+    $('#scripter-enabled').on('change', function() {
+        const settings = getSettings();
+        settings.enabled = $(this).prop('checked');
+        saveSettings();
         updateQuickButtonVisibility();
     });
-
+    
     // Quick button checkbox
-    bindEvent('#scripter-quick-btn-enabled', 'change', function() {
-        updateSettings({ quickButtonEnabled: $(this).prop('checked') });
+    $('#scripter-quick-btn-enabled').on('change', function() {
+        const settings = getSettings();
+        settings.quickButtonEnabled = $(this).prop('checked');
+        saveSettings();
         updateQuickButtonVisibility();
     });
-
+    
     // Shortcut checkbox
-    bindEvent('#scripter-shortcut-enabled', 'change', function() {
-        updateSettings({ shortcutEnabled: $(this).prop('checked') });
+    $('#scripter-shortcut-enabled').on('change', function() {
+        const settings = getSettings();
+        settings.shortcutEnabled = $(this).prop('checked');
+        saveSettings();
     });
-
+    
     // Theme select
-    bindEvent('#scripter-theme', 'change', function() {
-        const settings = updateSettings({ theme: $(this).val() });
+    $('#scripter-theme').on('change', function() {
+        const settings = getSettings();
+        settings.theme = $(this).val();
+        saveSettings();
         applyTheme(settings.theme);
     });
 
     // Auto resize checkbox
-    bindEvent('#scripter-auto-resize', 'change', function() {
-        const settings = updateSettings({ autoResize: $(this).prop('checked') });
-        if (settings.autoResize) {
-            scheduleSidebarWidthUpdate();
-        }
+    $('#scripter-auto-resize').on('change', function() {
+        const settings = getSettings();
+        settings.autoResize = $(this).prop('checked');
+        saveSettings();
+        if (settings.autoResize) updateSidebarWidth();
     });
 
     // Reset width button
-    bindEvent('#scripter-reset-width', 'click', () => {
+    $('#scripter-reset-width').on('click', () => {
         const sidebar = document.getElementById('scripter-sidebar-popup');
         if (sidebar) {
             sidebar.style.width = '350px';
@@ -1012,33 +960,53 @@ function setupSettingsHandlers() {
         }
     });
 
-    // Quick button action checkbox
-    bindEvent('#scripter-quick-btn-cut', 'change', function() {
-        const settings = updateSettings({
-            quickButtonAction: $(this).prop('checked') ? 'cut' : 'sidebar'
-        });
-        updateQuickButtonTooltip(settings);
+    // Sidebar position select
+    $('#scripter-sidebar-position').on('change', function() {
+        const settings = getSettings();
+        settings.sidebarPosition = $(this).val();
+        saveSettings();
+        applySidebarPosition(settings.sidebarPosition);
     });
 
+    // Quick button click action
+    $('#scripter-quick-btn-click').on('change', function() {
+        const settings = getSettings();
+        settings.quickButtonClick = $(this).val();
+        saveSettings();
+        updateQuickButtonTooltip();
+    });
+
+    // Quick button double-click action
+    $('#scripter-quick-btn-dblclick').on('change', function() {
+        const settings = getSettings();
+        settings.quickButtonDblClick = $(this).val();
+        saveSettings();
+        updateQuickButtonTooltip();
+    });
+    
     // Save final check prompt
-    bindEvent('#scripter-save-settings', 'click', () => {
-        updateSettings({ finalCheckPrompt: $('#scripter-final-check-prompt').val() });
+    $('#scripter-save-settings').on('click', () => {
+        const settings = getSettings();
+        settings.finalCheckPrompt = $('#scripter-final-check-prompt').val();
+        saveSettings();
         toastr.success('Settings saved');
     });
-
+    
     // Reset final check prompt
-    bindEvent('#scripter-reset-settings', 'click', () => {
+    $('#scripter-reset-settings').on('click', () => {
         $('#scripter-final-check-prompt').val(DEFAULT_FINAL_CHECK);
-        updateSettings({ finalCheckPrompt: DEFAULT_FINAL_CHECK });
+        const settings = getSettings();
+        settings.finalCheckPrompt = DEFAULT_FINAL_CHECK;
+        saveSettings();
         toastr.info('Final check prompt reset to default');
     });
-
+    
     // Clear all data
-    bindEvent('#scripter-clear-all-data', 'click', () => {
+    $('#scripter-clear-all-data').on('click', () => {
         if (confirm('Are you sure you want to clear all Scripter data from all chats?')) {
             // This only clears current chat's data
             // For full clear, we'd need server-side support
-            chat_metadata[MODULE_NAME] = JSON.parse(JSON.stringify(defaultChatData));
+            chat_metadata[MODULE_NAME] = { ...defaultChatData };
             saveChatData();
             syncUIFromData();
             toastr.info('Scripter data cleared for current chat');
@@ -1050,83 +1018,109 @@ function setupSettingsHandlers() {
 // Event Handlers Setup
 // ============================================
 
+// Helper: Set status (ready/action)
+function handleStatusClick(newStatus) {
+    const data = getChatData();
+    if (data.montage) return;
+    data.status = newStatus;
+    saveChatData();
+    updateStatusButtons(data.status, data.montage);
+}
+
+// Helper: Toggle montage
+function handleMontageClick() {
+    const data = getChatData();
+    data.montage = !data.montage;
+    saveChatData();
+    updateStatusButtons(data.status, data.montage);
+}
+
+// Helper: Sync auto-action checkboxes
+function handleAutoActionChange(checked) {
+    const data = getChatData();
+    data.autoAction = checked;
+    $('#scripter-auto-action, #scripter-auto-action-popup').prop('checked', checked);
+    saveChatData();
+}
+
+// Helper: Toggle prompt injection
+function handlePromptToggle() {
+    const data = getChatData();
+    data.promptEnabled = !data.promptEnabled;
+    saveChatData();
+    updatePromptToggle(data.promptEnabled);
+
+    if (data.promptEnabled) {
+        toastr.success('Prompt injection enabled');
+    } else {
+        toastr.info('Prompt injection disabled');
+    }
+}
+
 function setupEventHandlers() {
-    for (const binding of STATUS_BUTTON_BINDINGS) {
-        bindEvent(binding.selector, 'click', () => {
-            const data = getChatData();
-            if (data.montage || data.status === binding.status) {
-                return;
-            }
-
-            updateChatData({ status: binding.status }, { sync: 'status' });
-        });
-    }
-
-    for (const selector of MONTAGE_BUTTON_SELECTORS) {
-        bindEvent(selector, 'click', () => {
-            const data = getChatData();
-            updateChatData({ montage: !data.montage }, { sync: 'status' });
-        });
-    }
+    // Status buttons (sidebar + popup)
+    $('#scripter-ready-btn, #scripter-ready-btn-popup').on('click', () => handleStatusClick('ready'));
+    $('#scripter-action-btn, #scripter-action-btn-popup').on('click', () => handleStatusClick('action'));
+    $('#scripter-montage-btn, #scripter-montage-btn-popup').on('click', handleMontageClick);
 
     // CUT buttons
-    bindEvent('#scripter-cut-btn', 'click', executeCut);
-    bindEvent('#scripter-cut-btn-popup', 'click', executeCut);
+    $('#scripter-cut-btn, #scripter-cut-btn-popup').on('click', executeCut);
 
     // Auto-action checkboxes
-    bindEvent('#scripter-auto-action', 'change', function() {
-        updateChatData({ autoAction: $(this).prop('checked') }, { sync: 'autoAction' });
-    });
-    bindEvent('#scripter-auto-action-popup', 'change', function() {
-        updateChatData({ autoAction: $(this).prop('checked') }, { sync: 'autoAction' });
+    $('#scripter-auto-action, #scripter-auto-action-popup').on('change', function() {
+        handleAutoActionChange($(this).prop('checked'));
     });
 
     // Rollback buttons
-    bindEvent('#scripter-rollback-btn', 'click', showRollbackConfirm);
-    bindEvent('#scripter-rollback-btn-popup', 'click', showRollbackConfirm);
+    $('#scripter-rollback-btn, #scripter-rollback-btn-popup').on('click', showRollbackConfirm);
 
     // Upcoming buttons
-    bindEvent('#scripter-upcoming-btn', 'click', openQueuePopup);
-    bindEvent('#scripter-upcoming-btn-popup', 'click', openQueuePopup);
+    $('#scripter-upcoming-btn, #scripter-upcoming-btn-popup').on('click', openQueuePopup);
+    
+    // Prompt toggle buttons
+    $('#scripter-prompt-toggle, #scripter-prompt-toggle-popup').on('click', handlePromptToggle);
 
     // Sidebar controls
-    bindEvent('#scripter-sidebar-close', 'click', closeSidebar);
-    bindEvent('#scripter-popout-btn', 'click', openCenterPopup);
-
+    $('#scripter-sidebar-close').on('click', closeSidebar);
+    $('#scripter-popout-btn').on('click', openCenterPopup);
+    
     // Center popup controls
-    bindEvent('#scripter-center-close', 'click', closeCenterPopup);
-
+    $('#scripter-center-close').on('click', closeCenterPopup);
+    
     // Queue popup controls
-    bindEvent('#scripter-queue-close', 'click', closeQueuePopup);
-    bindEvent('#scripter-queue-add', 'click', addQueueItem);
-    bindEvent('#scripter-queue-clear', 'click', () => {
+    $('#scripter-queue-close').on('click', closeQueuePopup);
+    $('#scripter-queue-add').on('click', addQueueItem);
+    $('#scripter-queue-clear').on('click', () => {
         if (confirm('Clear all scenes from queue?')) {
             clearQueue();
         }
     });
-    bindEvent('#scripter-queue-export', 'click', exportQueue);
-    bindEvent('#scripter-queue-import', 'click', importQueue);
-
+    $('#scripter-queue-export').on('click', exportQueue);
+    $('#scripter-queue-import').on('click', importQueue);
+    
     // Queue item events (delegated)
-    bindDelegatedEvent('#scripter-queue-list', 'input', '.scripter-queue-item-textarea', function() {
+    $('#scripter-queue-list').on('input', '.scripter-queue-item-textarea', function() {
         const index = $(this).closest('.scripter-queue-item').data('index');
         updateQueueItem(index, $(this).val());
     });
-    bindDelegatedEvent('#scripter-queue-list', 'click', '.move-up', function() {
+    
+    $('#scripter-queue-list').on('click', '.move-up', function() {
         const index = $(this).closest('.scripter-queue-item').data('index');
         moveQueueItem(index, -1);
     });
-    bindDelegatedEvent('#scripter-queue-list', 'click', '.move-down', function() {
+    
+    $('#scripter-queue-list').on('click', '.move-down', function() {
         const index = $(this).closest('.scripter-queue-item').data('index');
         moveQueueItem(index, 1);
     });
-    bindDelegatedEvent('#scripter-queue-list', 'click', '.delete', function() {
+    
+    $('#scripter-queue-list').on('click', '.delete', function() {
         const index = $(this).closest('.scripter-queue-item').data('index');
         deleteQueueItem(index);
     });
-
+    
     // Collapsible block headers
-    bindDelegatedEvent(document, 'click', '.scripter-block-header', function() {
+    $(document).on('click', '.scripter-block-header', function() {
         toggleBlock($(this));
     });
 }
@@ -1136,61 +1130,32 @@ function setupEventHandlers() {
 // ============================================
 
 function setupChatEvents() {
-    teardownChatEvents();
-
-    chatEventHandlers = {
-        onChatChanged: () => {
-            syncUIFromData();
-        },
-        onGenerationStarted: () => {
-            console.log('[Scripter] Generation started - injecting prompt');
-            injectPrompt();
-        },
-        onMessageReceived: () => {
-            const data = getChatData();
-            const settings = getSettings();
-
-            if (!settings.enabled) {
-                return;
-            }
-
-            // If auto-action is enabled and status is READY, switch to ACTION
-            if (data.autoAction && data.status === 'ready' && !data.montage) {
-                console.log('[Scripter] Auto-proceeding to ACTION');
-                updateChatData({ status: 'action' }, { sync: 'status' });
-            }
+    // When chat changes, reload data
+    eventSource.on(event_types.CHAT_CHANGED, () => {
+        syncUIFromData();
+    });
+    
+    // Inject prompt before generation
+    eventSource.on(event_types.GENERATION_STARTED, () => {
+        console.log('[Scripter] Generation started - injecting prompt');
+        injectPrompt();
+    });
+    
+    // After AI response is received, handle auto-action
+    eventSource.on(event_types.MESSAGE_RECEIVED, () => {
+        const data = getChatData();
+        const settings = getSettings();
+        
+        if (!settings.enabled) return;
+        
+        // If auto-action is enabled and status is READY, switch to ACTION
+        if (data.autoAction && data.status === 'ready' && !data.montage) {
+            console.log('[Scripter] Auto-proceeding to ACTION');
+            data.status = 'action';
+            saveChatData();
+            updateStatusButtons(data.status, data.montage);
         }
-    };
-
-    eventSource.on(event_types.CHAT_CHANGED, chatEventHandlers.onChatChanged);
-    eventSource.on(event_types.GENERATION_STARTED, chatEventHandlers.onGenerationStarted);
-    eventSource.on(event_types.MESSAGE_RECEIVED, chatEventHandlers.onMessageReceived);
-}
-
-function teardownChatEvents() {
-    if (!chatEventHandlers || typeof eventSource.off !== 'function') {
-        chatEventHandlers = null;
-        return;
-    }
-
-    eventSource.off(event_types.CHAT_CHANGED, chatEventHandlers.onChatChanged);
-    eventSource.off(event_types.GENERATION_STARTED, chatEventHandlers.onGenerationStarted);
-    eventSource.off(event_types.MESSAGE_RECEIVED, chatEventHandlers.onMessageReceived);
-    chatEventHandlers = null;
-}
-
-function teardownDomEvents() {
-    $(document).off(EVENT_NS);
-    $(window).off(EVENT_NS);
-    $('#scripter-queue-list').off(EVENT_NS);
-    $('#scripter-wand-menu-item').off(EVENT_NS);
-    $('#scripter-quick-btn').off(EVENT_NS);
-}
-
-function cleanupLifecycle() {
-    teardownSidebarResizing();
-    teardownChatEvents();
-    teardownDomEvents();
+    });
 }
 
 // ============================================
@@ -1208,14 +1173,6 @@ function escapeHtml(text) {
 // ============================================
 
 jQuery(async () => {
-    // Remove stale containers if extension hot-reloads.
-    $('#scripter_settings').remove();
-    $('#scripter-sidebar-popup').remove();
-    $('#scripter-center-popup-overlay').remove();
-    $('#scripter-queue-popup-overlay').remove();
-    $('#scripter-wand-menu-item').remove();
-    $('#scripter-quick-btn').remove();
-
     // Load settings HTML
     const settingsHtml = await renderExtensionTemplateAsync(EXTENSION_FOLDER, 'settings');
     $('#extensions_settings').append(settingsHtml);
@@ -1223,9 +1180,6 @@ jQuery(async () => {
     // Load sidebar HTML
     const sidebarHtml = await renderExtensionTemplateAsync(EXTENSION_FOLDER, 'sidebar');
     $('body').append(sidebarHtml);
-
-    // Ensure hot-reloads don't accumulate handlers/observers.
-    cleanupLifecycle();
 
     // Update Montage button text to English
     $('#scripter-montage-btn').text('MONTAGE');
@@ -1246,10 +1200,10 @@ jQuery(async () => {
     
     // Setup sidebar resizing
     setupSidebarResizing();
-
+    
     // Handle window resize
-    bindEvent(window, 'resize', () => {
-        scheduleSidebarWidthUpdate();
+    $(window).on('resize', () => {
+        updateSidebarWidth();
     });
     
     // Initial sync

@@ -7,55 +7,76 @@
             <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
         </div>
         <div class="inline-drawer-content">
-            <div class="scripter-settings-block">
+            <!-- 기본 설정 -->
+            <div class="scripter-settings-section">
+                <div class="scripter-settings-section-title">기본 설정</div>
                 <label>
                     <input type="checkbox" id="scripter-enabled" checked>
                     스크립터 활성화
                 </label>
+                <div class="scripter-settings-row">
+                    <span class="scripter-settings-label">테마</span>
+                    <select id="scripter-theme" class="text_pole">
+                        <option value="default">Default</option>
+                        <option value="glassmorphism">Glassmorphism</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- 인터페이스 -->
+            <div class="scripter-settings-section">
+                <div class="scripter-settings-section-title">인터페이스</div>
+                <div class="scripter-settings-row">
+                    <span class="scripter-settings-label">사이드바</span>
+                    <select id="scripter-sidebar-position" class="text_pole">
+                        <option value="right">오른쪽</option>
+                        <option value="left">왼쪽</option>
+                    </select>
+                </div>
+                <div class="scripter-settings-inline">
+                    <label>
+                        <input type="checkbox" id="scripter-auto-resize" checked>
+                        자동 너비
+                    </label>
+                    <button id="scripter-reset-width" class="menu_button">초기화</button>
+                </div>
+            </div>
+
+            <!-- 퀵버튼 -->
+            <div class="scripter-settings-section">
+                <div class="scripter-settings-section-title">퀵버튼</div>
                 <label>
                     <input type="checkbox" id="scripter-quick-btn-enabled" checked>
                     퀵버튼 표시
                 </label>
-                <label>
-                    <input type="checkbox" id="scripter-shortcut-enabled" checked>
-                    단축키 활성화 (Ctrl+Shift+C)
-                </label>
-            </div>
-            
-            <hr class="scripter-settings-divider">
-            
-            <!-- 테마 설정 -->
-            <div class="scripter-settings-block">
-                <label>테마 (Theme)</label>
-                <select id="scripter-theme" class="text_pole">
-                    <option value="default">Default (SillyTavern)</option>
-                    <option value="glassmorphism">Glassmorphism</option>
-                </select>
-            </div>
-            
-            <hr class="scripter-settings-divider">
-            
-            <!-- 사이드바 너비 설정 -->
-            <div class="scripter-settings-block">
-                <label>
-                    <input type="checkbox" id="scripter-auto-resize" checked>
-                    자동 반응형 사이드바 너비
-                </label>
-                <div class="scripter-settings-buttons">
-                    <button id="scripter-reset-width" class="scripter-settings-btn">너비 초기화</button>
+                <div class="scripter-settings-row">
+                    <span class="scripter-settings-label">클릭</span>
+                    <select id="scripter-quick-btn-click" class="text_pole">
+                        <option value="sidebar">사이드바 열기</option>
+                        <option value="toggle">전송여부 토글</option>
+                        <option value="cut">CUT! 실행</option>
+                    </select>
+                </div>
+                <div class="scripter-settings-row">
+                    <span class="scripter-settings-label">더블클릭</span>
+                    <select id="scripter-quick-btn-dblclick" class="text_pole">
+                        <option value="toggle">전송여부 토글</option>
+                        <option value="sidebar">사이드바 열기</option>
+                        <option value="cut">CUT! 실행</option>
+                        <option value="none">비활성화</option>
+                    </select>
                 </div>
             </div>
-            
-            <hr class="scripter-settings-divider">
-            
-            <!-- 퀵버튼 동작 설정 -->
-            <div class="scripter-settings-block">
+
+            <!-- 단축키 -->
+            <div class="scripter-settings-section">
+                <div class="scripter-settings-section-title">단축키</div>
                 <label>
-                    <input type="checkbox" id="scripter-quick-btn-cut">
-                    퀵버튼 클릭 시 'CUT!' 실행 (기본: 사이드바 열기)
+                    <input type="checkbox" id="scripter-shortcut-enabled" checked>
+                    Ctrl+Shift+C 활성화
                 </label>
             </div>
-            
+
             <hr class="scripter-settings-divider">
             
             <div class="scripter-settings-block">
@@ -67,16 +88,16 @@ Before generating the response, strictly verify the following internally:
 3. **Consistency:** Is the response free of contradictions with World Info and recent context?
 (If any answer is NO, revise explicitly before outputting.)</textarea>
                 <div class="scripter-settings-buttons">
-                    <button id="scripter-save-settings" class="scripter-settings-btn">저장</button>
-                    <button id="scripter-reset-settings" class="scripter-settings-btn danger">초기화</button>
+                    <button id="scripter-save-settings" class="menu_button">저장</button>
+                    <button id="scripter-reset-settings" class="menu_button redWarning">초기화</button>
                 </div>
             </div>
             
             <hr class="scripter-settings-divider">
             
             <div class="scripter-settings-block">
-                <button id="scripter-clear-all-data" class="scripter-settings-btn danger">데이터 초기화</button>
-                <small class="scripter-settings-note">모든 채팅의 Scripter 데이터를 삭제합니다.</small>
+                <button id="scripter-clear-all-data" class="menu_button redWarning">데이터 초기화</button>
+                <small class="scripter-settings-hint">모든 채팅의 Scripter 데이터를 삭제합니다.</small>
             </div>
         </div>
     </div>
