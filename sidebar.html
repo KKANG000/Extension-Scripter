@@ -2,7 +2,7 @@
 <div id="scripter-sidebar-popup" class="hidden" data-scripter-theme="default">
     <!-- Resize handle removed -->
     <div class="scripter-header">
-        <h3 style="font-size: calc(1em + 1px);">SCRIPT SUPERVISOR</h3>
+        <h3>SCRIPT SUPERVISOR</h3>
         <div class="scripter-header-buttons">
             <button id="scripter-popout-btn" class="scripter-header-btn" title="Open in popup">⇱</button>
             <button id="scripter-sidebar-close" class="scripter-header-btn" title="Close">✕</button>
@@ -40,7 +40,7 @@
         <div class="scripter-block" data-block="caution">
             <div class="scripter-block-header collapsed">
                 <span class="icon">⚠️</span>
-                <span class="title" style="font-size: calc(1em + 2px);"><b>Caution</b></span>
+                <span class="title">Caution</span>
                 <span class="toggle">▼</span>
             </div>
             <div class="scripter-block-content collapsed">
@@ -52,7 +52,7 @@
         <div class="scripter-block" data-block="current">
             <div class="scripter-block-header">
                 <span class="icon">🎬</span>
-                <span class="title" style="font-size: calc(1em + 2px);"><b>Current Scene (Main)</b></span>
+                <span class="title">Current Scene (Main)</span>
                 <span class="toggle">▼</span>
             </div>
             <div class="scripter-block-content">
@@ -67,7 +67,7 @@
         <div class="scripter-block" data-block="next">
             <div class="scripter-block-header">
                 <span class="icon">⭐</span>
-                <span class="title" style="font-size: calc(1em + 2px);"><b>Next Scene (Teaser)</b></span>
+                <span class="title">Next Scene (Teaser)</span>
                 <span class="toggle">▼</span>
             </div>
             <div class="scripter-block-content">
@@ -83,7 +83,7 @@
         <div class="scripter-block" data-block="core">
             <div class="scripter-block-header collapsed">
                 <span class="icon">📋</span>
-                <span class="title" style="font-size: calc(1em + 2px);"><b>Core Principle</b></span>
+                <span class="title">Core Principle</span>
                 <span class="toggle">▼</span>
             </div>
             <div class="scripter-block-content collapsed">
@@ -97,63 +97,65 @@
 <div id="scripter-center-popup-overlay" class="hidden">
     <div id="scripter-center-popup" data-scripter-theme="default">
         <div class="scripter-header">
-            <h3 style="font-size: calc(1em + 1px);">SCRIPT SUPERVISOR</h3>
+            <h3>SCRIPT SUPERVISOR</h3>
             <div class="scripter-header-buttons">
                 <button id="scripter-center-close" class="scripter-header-btn" title="Close">✕</button>
             </div>
         </div>
         <div class="scripter-popup-content">
-            <!-- Column 1: Current Scene + Next Scene (Flex 4) -->
-            <div class="scripter-popup-column scripter-popup-column-main" style="flex: 4; display: flex; flex-direction: column; gap: 5px;">
-                <div class="scripter-block" data-block="current-popup" style="flex-grow: 1; display: flex; flex-direction: column; margin-bottom: 0;">
+            <!-- Column 1: Current Scene + Next Scene (2/3 width) -->
+            <div class="scripter-popup-column scripter-popup-column-main">
+                <div class="scripter-block" data-block="current-popup">
                     <div class="scripter-block-header scripter-no-collapse">
                         <span class="icon">🎬</span>
-                        <span class="title" style="font-size: calc(1em + 2px);"><b>Current Scene (Main)</b></span>
-                        <button id="scripter-rollback-btn-popup" class="scripter-rollback-btn" title="Restore previous scene" disabled style="margin-left: auto;">↩</button>
+                        <span class="title scripter-popup-title">Current Scene (Main)</span>
                     </div>
-                    <div class="scripter-block-content" style="flex-grow: 1; display: flex; flex-direction: column;">
-                        <textarea id="scripter-current-scene-popup" placeholder="Enter current scene..." style="flex-grow: 1; height: 100%; width: 100%;"></textarea>
+                    <div class="scripter-block-content">
+                        <textarea id="scripter-current-scene-popup" placeholder="Enter current scene..."></textarea>
+                        <div class="scripter-current-scene-footer">
+                            <button id="scripter-rollback-btn-popup" class="scripter-rollback-btn" title="Restore previous scene" disabled>↩</button>
+                        </div>
                     </div>
                 </div>
                 
-                <div class="scripter-block" data-block="next-popup" style="flex-grow: 1; display: flex; flex-direction: column; margin-bottom: 0;">
+                <div class="scripter-block" data-block="next-popup">
                     <div class="scripter-block-header scripter-no-collapse">
                         <span class="icon">⭐</span>
-                        <span class="title" style="font-size: calc(1em + 2px);"><b>Next Scene (Teaser)</b></span>
-                        <span class="scripter-queue-count" style="margin-left: auto;">Queue: <span id="scripter-queue-count-num-popup">0</span></span>
+                        <span class="title scripter-popup-title">Next Scene (Teaser)</span>
                     </div>
-                    <div class="scripter-block-content" style="flex-grow: 1; display: flex; flex-direction: column;">
-                        <textarea id="scripter-next-scene-popup" placeholder="Enter next scene..." style="flex-grow: 1; height: 100%; width: 100%;"></textarea>
+                    <div class="scripter-block-content">
+                        <textarea id="scripter-next-scene-popup" placeholder="Enter next scene..."></textarea>
                         <div class="scripter-next-scene-footer">
                             <button id="scripter-upcoming-btn-popup" class="scripter-upcoming-btn">Upcoming...</button>
+                            <span class="scripter-queue-count">Queue: <span id="scripter-queue-count-num-popup">0</span></span>
                         </div>
                     </div>
                 </div>
             </div>
             
-            <!-- Column 2: Caution + Core + Controls (Flex 3) -->
-            <div class="scripter-popup-column scripter-popup-column-side" style="flex: 3; display: flex; flex-direction: column; gap: 5px;">
-                <div class="scripter-block" data-block="caution-popup" style="flex-grow: 1; display: flex; flex-direction: column; margin-bottom: 0;">
+            <!-- Column 2: Caution + Core + Controls (1/3 width) -->
+            <div class="scripter-popup-column scripter-popup-column-side">
+                <div class="scripter-block scripter-popup-stretch-block" data-block="caution-popup">
                     <div class="scripter-block-header scripter-no-collapse">
                         <span class="icon">⚠️</span>
-                        <span class="title" style="font-size: calc(1em + 2px);"><b>Caution</b></span>
+                        <span class="title scripter-popup-title">Caution</span>
                     </div>
-                    <div class="scripter-block-content" style="flex-grow: 1; display: flex; flex-direction: column;">
-                        <textarea id="scripter-caution-popup" placeholder="Enter cautions..." style="flex-grow: 1; height: 100%; width: 100%;"></textarea>
+                    <div class="scripter-block-content scripter-popup-stretch-content">
+                        <textarea id="scripter-caution-popup" class="scripter-popup-fill-textarea" placeholder="Enter cautions..."></textarea>
                     </div>
                 </div>
                 
-                <div class="scripter-block" data-block="core-popup" style="flex-grow: 1; display: flex; flex-direction: column; margin-bottom: 0;">
+                <div class="scripter-block scripter-popup-stretch-block" data-block="core-popup">
                     <div class="scripter-block-header scripter-no-collapse">
                         <span class="icon">📋</span>
-                        <span class="title" style="font-size: calc(1em + 2px);"><b>Core Principle</b></span>
+                        <span class="title scripter-popup-title">Core Principle</span>
                     </div>
-                    <div class="scripter-block-content" style="flex-grow: 1; display: flex; flex-direction: column;">
-                        <textarea id="scripter-core-principle-popup" placeholder="Enter core principle..." style="flex-grow: 1; height: 100%; width: 100%;"></textarea>
+                    <div class="scripter-block-content scripter-popup-stretch-content">
+                        <textarea id="scripter-core-principle-popup" class="scripter-popup-fill-textarea" placeholder="Enter core principle..."></textarea>
                     </div>
                 </div>
                 
-                <div class="scripter-popup-controls" style="margin-top: auto; margin-bottom: 0; display: flex; flex-direction: column; gap: 5px;">
+                <div class="scripter-popup-controls">
                     <label class="scripter-auto-action">
                         <input type="checkbox" id="scripter-auto-action-popup">
                         Auto-proceed Action

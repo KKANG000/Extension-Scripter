@@ -2,6 +2,12 @@
    SCRIPTER EXTENSION STYLES
    ============================================= */
 
+:root {
+    --scripter-transition-fast: 0.2s;
+    --scripter-transition-medium: 0.3s;
+    --scripter-overlay-bg: rgba(0, 0, 0, 0.6);
+}
+
 /* ===== Sidebar Popup Base ===== */
 #scripter-sidebar-popup {
     position: fixed;
@@ -15,7 +21,7 @@
     overflow-y: auto; /* Restored: Enable scrolling */
     display: flex;
     flex-direction: column;
-    transition: width 0.3s ease;
+    transition: width var(--scripter-transition-medium) ease;
 }
 
 #scripter-sidebar-popup.hidden {
@@ -31,7 +37,7 @@
     left: 0;
     width: 100vw;
     height: 100vh;
-    background: rgba(0, 0, 0, 0.6);
+    background: var(--scripter-overlay-bg);
     z-index: 1500;
     display: flex;
     align-items: center;
@@ -59,7 +65,7 @@
     left: 0;
     width: 100vw;
     height: 100vh;
-    background: rgba(0, 0, 0, 0.6);
+    background: var(--scripter-overlay-bg);
     z-index: 2000;
     display: flex;
     align-items: center;
@@ -271,7 +277,7 @@
     padding: 4px 8px;
     font-size: 14px;
     opacity: 0.7;
-    transition: opacity 0.2s;
+    transition: opacity var(--scripter-transition-fast);
 }
 
 .scripter-header-btn:hover {
@@ -321,7 +327,11 @@
     cursor: pointer;
     font-size: 15px;
     font-weight: 600;
-    transition: all 0.2s;
+    transition:
+        background-color var(--scripter-transition-fast),
+        color var(--scripter-transition-fast),
+        box-shadow var(--scripter-transition-fast),
+        text-shadow var(--scripter-transition-fast);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -376,7 +386,11 @@
     cursor: pointer;
     font-size: 12px;
     font-weight: 600;
-    transition: all 0.2s;
+    transition:
+        background-color var(--scripter-transition-fast),
+        color var(--scripter-transition-fast),
+        box-shadow var(--scripter-transition-fast),
+        text-shadow var(--scripter-transition-fast);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -412,7 +426,9 @@
     font-size: 18px;
     font-weight: bold;
     cursor: pointer;
-    transition: all 0.2s;
+    transition:
+        background-color var(--scripter-transition-fast),
+        box-shadow var(--scripter-transition-fast);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -453,7 +469,7 @@
     padding: 10px 12px;
     cursor: pointer;
     user-select: none;
-    transition: background 0.2s;
+    transition: background var(--scripter-transition-fast);
 }
 
 .scripter-block-header .icon {
@@ -472,7 +488,7 @@
 .scripter-block-header .toggle {
     font-size: 12px;
     color: var(--SmartThemeBodyColor, #888);
-    transition: transform 0.2s;
+    transition: transform var(--scripter-transition-fast);
 }
 
 .scripter-block-header.collapsed .toggle {
@@ -503,7 +519,9 @@
     resize: vertical;
     box-sizing: border-box;
     outline: none;
-    transition: border-color 0.2s, box-shadow 0.2s;
+    transition:
+        border-color var(--scripter-transition-fast),
+        box-shadow var(--scripter-transition-fast);
 }
 
 /* ===== Block Footer Elements ===== */
@@ -522,7 +540,11 @@
     cursor: pointer;
     font-size: 12px;
     padding: 4px 10px;
-    transition: all 0.2s;
+    transition:
+        background-color var(--scripter-transition-fast),
+        color var(--scripter-transition-fast),
+        border-color var(--scripter-transition-fast),
+        opacity var(--scripter-transition-fast);
 }
 
 .scripter-rollback-btn:hover {
@@ -551,7 +573,10 @@
     color: var(--SmartThemeBodyColor, #ccc);
     font-size: 13px;
     cursor: pointer;
-    transition: all 0.2s;
+    transition:
+        background-color var(--scripter-transition-fast),
+        border-color var(--scripter-transition-fast),
+        color var(--scripter-transition-fast);
 }
 
 .scripter-upcoming-btn:hover {
@@ -619,7 +644,10 @@
     cursor: pointer;
     padding: 4px 8px;
     font-size: 12px;
-    transition: all 0.2s;
+    transition:
+        background-color var(--scripter-transition-fast),
+        border-color var(--scripter-transition-fast),
+        color var(--scripter-transition-fast);
 }
 
 .scripter-queue-item-btn:hover {
@@ -644,7 +672,10 @@
     color: var(--SmartThemeBodyColor, #888);
     font-size: 13px;
     cursor: pointer;
-    transition: all 0.2s;
+    transition:
+        background-color var(--scripter-transition-fast),
+        border-color var(--scripter-transition-fast),
+        color var(--scripter-transition-fast);
     margin-top: 10px;
 }
 
@@ -674,7 +705,10 @@
     color: var(--SmartThemeBodyColor, #ccc);
     font-size: 13px;
     cursor: pointer;
-    transition: all 0.2s;
+    transition:
+        background-color var(--scripter-transition-fast),
+        border-color var(--scripter-transition-fast),
+        color var(--scripter-transition-fast);
 }
 
 .scripter-queue-footer-btn:hover {
@@ -701,6 +735,30 @@
     flex: 1;
     overflow: hidden;
     padding: 15px;
+}
+
+.scripter-popup-title {
+    font-size: calc(1em + 2px);
+    font-weight: bold;
+    text-decoration: underline;
+}
+
+.scripter-popup-stretch-block {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.scripter-popup-stretch-content {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.scripter-popup-fill-textarea {
+    flex-grow: 1;
+    height: 100%;
+    width: 100%;
 }
 
 .scripter-popup-column {
@@ -758,7 +816,10 @@
     color: #333;
     font-size: 12px;
     cursor: pointer;
-    transition: all 0.2s;
+    transition:
+        background-color var(--scripter-transition-fast),
+        transform var(--scripter-transition-fast),
+        box-shadow var(--scripter-transition-fast);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -815,6 +876,12 @@
     opacity: 0.6;
 }
 
+.scripter-settings-note {
+    display: block;
+    margin-top: 5px;
+    color: #888;
+}
+
 /* =============================================
    CONFIRMATION POPUP
    ============================================= */
@@ -853,7 +920,10 @@
     color: var(--SmartThemeBodyColor, #ccc);
     font-size: 13px;
     cursor: pointer;
-    transition: all 0.2s;
+    transition:
+        background-color var(--scripter-transition-fast),
+        border-color var(--scripter-transition-fast),
+        color var(--scripter-transition-fast);
 }
 
 .scripter-confirm-btn:hover {
